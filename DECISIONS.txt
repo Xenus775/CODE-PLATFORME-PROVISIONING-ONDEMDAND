@@ -1,0 +1,146 @@
+==================================================
+DECISION : VM dediee portal01 plutot qu'extension de LPRANSIBLE01
+==================================================
+
+CONTEXTE
+--------
+
+Le portail doit executer Terraform (token API Proxmox, cle SSH vers le
+noeud Proxmox) pour creer des VM a la demande. LPRANSIBLE01 (control-node
+Ansible existant) aurait pu heberger ce code, evitant une VM
+supplementaire.
+
+DECISION
+--------
+
+Une VM dediee, `portal01`, heberge le portail et execute Terraform.
+LPRANSIBLE01 reste strictement scope a l'execution d'Ansible : il ne
+detient ni le token API Proxmox, ni de cle SSH vers le noeud Proxmox.
+
+RAISON
+------
+
+Coherent avec la separation deja actee entre INFRA-TERRAFORM-PVE-HOME
+(creation de VM) et INFRA-ANSIBLE-PVE-HOME (configuration logicielle,
+voir leurs DECISIONS.txt respectifs). Etendre LPRANSIBLE01 aurait
+concentre sur une seule VM la capacite de creer/detruire n'importe quelle
+VM du pool IAC ET d'administrer leur configuration - un seul compromis
+donnerait alors un controle total sur l'infrastructure.
+
+IMPACT
+------
+
+Positif : perimetre de compromission limite (portal01 = Terraform,
+LPRANSIBLE01 = Ansible, chacune avec ses propres identifiants dedies).
+Negatif : une VM de plus a maintenir ; le portail ne lance jamais
+ansible-playbook lui-meme, il doit passer par une commande SSH vers
+LPRANSIBLE01 pour la partie configuration.
+
+
+==================================================
+DECISION : Fichiers Terraform generes a plat, pas dans un sous-dossier
+==================================================
+
+CONTEXTE
+--------
+
+Le portail doit ajouter une VM par ecriture de fichier plutot que par
+edition manuelle de main.tf.
+
+DECISION
+--------
+
+Chaque VM generee produit un fichier `generated.<vm>.tf` a la racine du
+depot Terraform (meme dossier que main.tf), pas dans un sous-dossier.
+
+RAISON
+------
+
+Terraform ne charge automatiquement que les .tf du dossier racine. Un
+sous-dossier necessiterait un `module` imbrique (`module "generated" {
+source = "./generated" }`), ajoutant une couche inutile et compliquant
+l'acces aux outputs par VM (`module.generated.module.<vm>.xxx` au lieu de
+`module.<vm>.xxx`). Verifie explicitement cette session avant
+implementation (fichier de test cree puis supprime, jamais applique).
+
+IMPACT
+------
+
+Positif : mecanique simple, un fichier = une VM, directement au niveau
+racine comme les blocs ecrits a la main.
+Negatif : le dossier racine du depot Terraform va accumuler des fichiers
+generes au fil du temps ; a revisiter si leur nombre devient genant.
+
+
+==================================================
+DECISION : Pas de base de donnees, etat des jobs en memoire
+==================================================
+
+CONTEXTE
+--------
+
+Le pipeline complet (terraform apply + decouverte IP + playbooks Ansible)
+peut prendre plusieurs minutes (l'agent QEMU seul a mis 15+ minutes lors
+des tests de cette session). Il fallait un modele pour suivre l'avancement
+sans bloquer la requete HTTP.
+
+DECISION
+--------
+
+Modele asynchrone minimal : `POST /provision` valide et demarre le
+pipeline en arriere-plan (non attendu), redirige immediatement vers
+`/jobs/:id`, qui poll `/jobs/:id/data` cote client. L'etat des jobs vit
+dans une simple `Map` en memoire du process Node - pas de base de
+donnees, pas de file de taches (Redis, etc.).
+
+RAISON
+------
+
+Un seul provisioning a la fois (verrou global explicite, voir
+services/lock.js) : une structure en memoire suffit largement, ajouter
+une dependance externe serait disproportionne pour ce volume d'usage.
+
+IMPACT
+------
+
+Positif : aucune dependance supplementaire, code lisible de bout en bout.
+Negatif : l'historique des jobs est perdu au redemarrage du process ; pas
+de probleme pour un usage personnel avec un seul provisioning a la fois.
+
+
+==================================================
+DECISION : Identifiants generes affiches une seule fois, jamais stockes
+==================================================
+
+CONTEXTE
+--------
+
+Les roles Ansible (postgresql, mysql, wordpress, exploitation_account)
+generent des mots de passe aleatoires a la creation d'une VM.
+
+DECISION
+--------
+
+Le portail parse ces mots de passe depuis la sortie SSH des playbooks
+(lignes marqueurs machine-lisibles) et les affiche une seule fois sur la
+page de resultat du job, avec un avertissement explicite. Ils ne sont
+jamais ecrits sur disque, ni loggues au-dela de la duree de vie du
+process.
+
+RAISON
+------
+
+Coherent avec la posture deja adoptee par INFRA-ANSIBLE-PVE-HOME pour le
+compte exploitation : ces mots de passe sont des identifiants de secours,
+pas geres par un coffre-fort de secrets (pas de justification pour
+introduire Vault/un secret manager pour un usage personnel a ce stade).
+
+IMPACT
+------
+
+Positif : simplicite, aucun secret supplementaire a proteger cote
+portail.
+Negatif : si l'operateur rate la page de resultat, le mot de passe est
+perdu (recuperable en re-executant le role concerne sur la VM via
+Ansible directement, sauf pour exploitation_account et les roles a
+sentinelle qui ne regenerent pas le mot de passe automatiquement).

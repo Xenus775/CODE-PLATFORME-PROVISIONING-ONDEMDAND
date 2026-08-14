@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include('partials/head', { title: 'Provisioning ' + job.vmName }) %>
+</head>
+<body>
+  <main>
+    <h1>Provisioning de <%= job.vmName %></h1>
+    <p>Statut : <span id="phase"><%= job.phase %></span></p>
+
+    <pre id="log"><%= job.log.join("\n") %></pre>
+
+    <div id="result"></div>
+
+    <p><a href="/">&larr; Nouveau provisioning</a></p>
+  </main>
+
+  <script>
+    const jobId = <%- JSON.stringify(job.id) %>;
+    const finalPhases = ["done", "failed"];
+
+    function renderCredentials(credentials) {
+      if (!credentials || credentials.length === 0) return "";
+      const cards = credentials
+        .map(function (c) {
+          const fields = Object.entries(c.fields)
+            .map(function ([k, v]) { return "<div><strong>" + k + " :</strong> " + v + "</div>"; })
+            .join("");
+          return '<div class="cred-card"><h3>' + c.type + "</h3>" + fields + "</div>";
+        })
+        .join("");
+      return (
+        '<p class="banner banner-warning">A noter maintenant - rien n\'est stocke, cette page ne peut pas etre regeneree.</p>' +
+        cards
+      );
+    }
+
+    async function poll() {
+      const res = await fetch(`/jobs/${jobId}/data`);
+      const data = await res.json();
+
+      document.getElementById("phase").textContent = data.phase;
+      document.getElementById("log").textContent = data.log.join("\n");
+
+      if (data.error) {
+        document.getElementById("result").innerHTML =
+          '<p class="banner banner-error">Erreur : ' + data.error + "</p>";
+      } else if (data.phase === "done") {
+        document.getElementById("result").innerHTML = renderCredentials(data.credentials);
+      }
+
+      if (!finalPhases.includes(data.phase)) {
+        setTimeout(poll, 3000);
+      }
+    }
+
+    poll();
+  </script>
+</body>
+</html>

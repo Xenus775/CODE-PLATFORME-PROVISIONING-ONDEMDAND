@@ -1,0 +1,87 @@
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 640px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  color: #1a1a1a;
+}
+
+h1 {
+  font-size: 1.4rem;
+}
+
+form label {
+  display: block;
+  margin-bottom: 0.9rem;
+}
+
+form label.inline {
+  display: inline-block;
+  margin-right: 1rem;
+}
+
+input, select {
+  display: block;
+  width: 100%;
+  padding: 0.4rem;
+  margin-top: 0.2rem;
+  box-sizing: border-box;
+}
+
+label.inline input {
+  display: inline;
+  width: auto;
+}
+
+fieldset {
+  margin-bottom: 0.9rem;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.errors {
+  color: #b00020;
+}
+
+.banner {
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+}
+
+.banner-warning {
+  background: #fff3cd;
+  border: 1px solid #ffe69c;
+}
+
+.banner-error {
+  background: #f8d7da;
+  border: 1px solid #f1aeb5;
+}
+
+.cred-card {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.cred-card h3 {
+  margin: 0 0 0.4rem 0;
+  font-size: 1rem;
+}
+
+#log {
+  background: #111;
+  color: #eee;
+  padding: 1rem;
+  border-radius: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}

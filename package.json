@@ -1,0 +1,17 @@
+{
+  "name": "code-platforme-provisioning-ondemdand",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Portail web de provisioning on-demand de VM (Terraform + Ansible)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-basic-auth": "^1.2.1",
+    "js-yaml": "^4.1.0"
+  }
+}
