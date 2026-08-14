@@ -1,7 +1,15 @@
-const https = require("https");
 const config = require("../config");
 
-const insecureAgent = new https.Agent({ rejectUnauthorized: !config.proxmoxTlsInsecure });
+// Le fetch natif de Node (undici) n'accepte pas l'option `agent` du module
+// https - elle est silencieusement ignoree, donc le certificat auto-signe
+// de Proxmox etait toujours rejete malgre proxmoxTlsInsecure (bug trouve
+// lors du premier test de bout en bout via le formulaire : "fetch failed").
+// NODE_TLS_REJECT_UNAUTHORIZED reste le mecanisme le plus simple pour
+// undici ; acceptable ici car ce process n'appelle en HTTPS que ce seul
+// hote Proxmox de confiance, deja garanti par le token API + les cles SSH.
+if (config.proxmoxTlsInsecure) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
 
 async function proxmoxRequest(pathSuffix) {
   const url = `${config.proxmoxApiEndpoint}${pathSuffix}`;
@@ -9,7 +17,6 @@ async function proxmoxRequest(pathSuffix) {
     headers: {
       Authorization: `PVEAPIToken=${config.proxmoxApiTokenId}=${config.proxmoxApiTokenSecret}`,
     },
-    agent: insecureAgent,
   });
   if (!res.ok) {
     throw new Error(`Proxmox API ${pathSuffix} -> HTTP ${res.status}`);
