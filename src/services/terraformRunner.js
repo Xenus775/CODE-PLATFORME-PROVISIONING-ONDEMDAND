@@ -1,13 +1,17 @@
 const { execFile } = require("child_process");
 const config = require("../config");
 
-function run(args, log) {
+// 25 min : l'agent QEMU peut mettre plus de 15 min a repondre pendant la
+// creation d'une VM (observe plusieurs fois cette session), le provider
+// bpg/proxmox attend son propre timeout interne (15m, voir agent.timeout
+// dans modules/vm) avant d'abandonner - il faut de la marge au-dessus.
+function run(args, log, timeoutMs = 25 * 60 * 1000) {
   return new Promise((resolve, reject) => {
     log(`$ terraform ${args.join(" ")}`);
     execFile(
       "terraform",
       args,
-      { cwd: config.terraformRepoPath, timeout: 10 * 60 * 1000, maxBuffer: 32 * 1024 * 1024 },
+      { cwd: config.terraformRepoPath, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (stdout) log(stdout.trim());
         if (stderr) log(stderr.trim());
