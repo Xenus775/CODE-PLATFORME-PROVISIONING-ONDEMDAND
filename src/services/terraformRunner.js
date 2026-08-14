@@ -25,14 +25,19 @@ function run(args, log) {
 // cause de l'agent QEMU (observe plusieurs fois). Un refresh complet
 // periodique manuel reste recommande pour detecter une derive reelle.
 async function applyGeneratedVm(vmName, log) {
-  await run(["fmt", "-check"], log).catch(() => {
+  // Chaque generated.<vm>.tf ajoute un nouveau bloc "module" : Terraform
+  // doit re-executer init pour l'enregistrer avant tout plan/validate,
+  // meme si le provider est deja installe (verifie manuellement cette
+  // session avant d'ecrire ce code).
+  await run(["init", "-input=false", "-no-color"], log);
+  await run(["fmt", "-check", "-no-color"], log).catch(() => {
     // fmt -check est informatif (echoue si mal formate) - ne bloque pas l'apply
   });
-  await run(["validate"], log);
+  await run(["validate", "-no-color"], log);
   // -target limite l'apply au module de cette VM : evite d'appliquer un
   // changement non lie qui trainerait dans le repertoire de travail.
-  await run(["plan", "-refresh=false", `-target=module.${vmName}`, "-out=tfplan"], log);
-  await run(["apply", "-auto-approve", "tfplan"], log);
+  await run(["plan", "-refresh=false", `-target=module.${vmName}`, "-out=tfplan", "-no-color"], log);
+  await run(["apply", "-auto-approve", "-no-color", "tfplan"], log);
 }
 
 module.exports = { applyGeneratedVm };
