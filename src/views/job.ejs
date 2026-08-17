@@ -1,60 +1,135 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <%- include('partials/head', { title: 'Provisioning ' + job.vmName }) %>
+  <%- include('partials/head', { title: job.vmName + ' - provisioning' }) %>
 </head>
 <body>
-  <main>
-    <h1>Provisioning de <%= job.vmName %></h1>
-    <p>Statut : <span id="phase"><%= job.phase %></span></p>
+  <div class="page">
+    <div class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">IaC</span> Portail de provisioning</a>
+      <a class="link" href="/">&larr; Nouveau provisioning</a>
+    </div>
 
-    <pre id="log"><%= job.log.join("\n") %></pre>
+    <div class="job-header">
+      <h1><%= job.vmName %></h1>
+      <span class="badge <%= phases.badgeClass(job.phase) %>" id="badge">
+        <span class="badge-dot"></span><span id="badge-label"><%= phases.label(job.phase) %></span>
+      </span>
+    </div>
+    <p class="phase-line">IP : <span id="ip"><%= job.ip || 'en cours de decouverte...' %></span></p>
 
-    <div id="result"></div>
+    <div id="banner-area">
+      <% if (job.error) { %>
+        <p class="banner banner-error">Erreur : <%= job.error %></p>
+      <% } %>
+    </div>
 
-    <p><a href="/">&larr; Nouveau provisioning</a></p>
-  </main>
+    <div class="card">
+      <h2>Journal</h2>
+      <div class="log-viewer" id="log"><% job.log.forEach(function(line) { %><div class="line"><%= line %></div><% }) %></div>
+    </div>
+
+    <div id="cred-area">
+      <% if (job.credentials && job.credentials.length > 0) { %>
+        <div class="card">
+          <h2>Identifiants generes</h2>
+          <p class="banner banner-warning">A noter maintenant - rien n'est stocke, cette page ne peut pas etre regeneree.</p>
+          <div id="cred-list"></div>
+        </div>
+      <% } %>
+    </div>
+  </div>
 
   <script>
     const jobId = <%- JSON.stringify(job.id) %>;
-    const finalPhases = ["done", "failed"];
+    const FINAL_PHASES = ["done", "failed"];
+    const PHASE_LABELS = <%- JSON.stringify(phases.LABELS) %>;
+    let logLineCount = <%- job.log.length %>;
+    let credentialsRendered = <%- job.credentials.length > 0 ? 'true' : 'false' %>;
+
+    function badgeClass(phase) {
+      if (phase === "done") return "badge-done";
+      if (phase === "failed") return "badge-failed";
+      if (phase.startsWith("queued")) return "badge-queued";
+      return "badge-running";
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    }
+
+    function appendLogLines(lines) {
+      const el = document.getElementById("log");
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+      for (const line of lines) {
+        const div = document.createElement("div");
+        div.className = "line" + (line.startsWith("$ ") ? " line-cmd" : /error|echoue|ERREUR/i.test(line) ? " line-error" : "");
+        div.textContent = line;
+        el.appendChild(div);
+      }
+      if (atBottom) el.scrollTop = el.scrollHeight;
+    }
 
     function renderCredentials(credentials) {
-      if (!credentials || credentials.length === 0) return "";
+      if (credentialsRendered || !credentials || credentials.length === 0) return;
+      credentialsRendered = true;
+      const area = document.getElementById("cred-area");
       const cards = credentials
         .map(function (c) {
           const fields = Object.entries(c.fields)
-            .map(function ([k, v]) { return "<div><strong>" + k + " :</strong> " + v + "</div>"; })
+            .map(function ([k, v]) {
+              return (
+                '<div class="cred-field"><span class="k">' + k + '</span>' +
+                '<span class="v" id="v-' + c.type + '-' + k + '">' + escapeHtml(v) + '</span>' +
+                '<button class="copy-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(v) + ')">copier</button></div>'
+              );
+            })
             .join("");
           return '<div class="cred-card"><h3>' + c.type + "</h3>" + fields + "</div>";
         })
         .join("");
-      return (
+      area.innerHTML =
+        '<div class="card"><h2>Identifiants generes</h2>' +
         '<p class="banner banner-warning">A noter maintenant - rien n\'est stocke, cette page ne peut pas etre regeneree.</p>' +
-        cards
-      );
+        '<div id="cred-list">' + cards + "</div></div>";
     }
 
     async function poll() {
-      const res = await fetch(`/jobs/${jobId}/data`);
-      const data = await res.json();
-
-      document.getElementById("phase").textContent = data.phase;
-      document.getElementById("log").textContent = data.log.join("\n");
-
-      if (data.error) {
-        document.getElementById("result").innerHTML =
-          '<p class="banner banner-error">Erreur : ' + data.error + "</p>";
-      } else if (data.phase === "done") {
-        document.getElementById("result").innerHTML = renderCredentials(data.credentials);
+      let data;
+      try {
+        const res = await fetch(`/jobs/${jobId}/data`);
+        data = await res.json();
+      } catch (e) {
+        setTimeout(poll, 2000);
+        return;
       }
 
-      if (!finalPhases.includes(data.phase)) {
-        setTimeout(poll, 3000);
+      document.getElementById("badge").className = "badge " + badgeClass(data.phase);
+      document.getElementById("badge-label").textContent = PHASE_LABELS[data.phase] || data.phase;
+      if (data.ip) document.getElementById("ip").textContent = data.ip;
+
+      if (data.log.length > logLineCount) {
+        appendLogLines(data.log.slice(logLineCount));
+        logLineCount = data.log.length;
+      }
+
+      if (data.error) {
+        document.getElementById("banner-area").innerHTML =
+          '<p class="banner banner-error">Erreur : ' + escapeHtml(data.error) + "</p>";
+      }
+
+      if (data.phase === "done") {
+        renderCredentials(data.credentials);
+      }
+
+      if (!FINAL_PHASES.includes(data.phase)) {
+        setTimeout(poll, 1500);
       }
     }
 
-    poll();
+    if (!FINAL_PHASES.includes(<%- JSON.stringify(job.phase) %>)) {
+      poll();
+    }
   </script>
 </body>
 </html>

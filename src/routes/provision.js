@@ -2,8 +2,8 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
-const lockService = require("../services/lock");
 const jobsStore = require("../services/jobs");
+const phases = require("../services/phases");
 const { runProvisioning, SERVICES } = require("../services/orchestrator");
 
 const router = express.Router();
@@ -26,6 +26,8 @@ function validateInput(body) {
     errors.push(`Le nom '${vmName}' est reserve.`);
   } else if (fs.existsSync(path.join(config.terraformRepoPath, `generated.${vmName}.tf`))) {
     errors.push(`Une VM '${vmName}' a deja ete generee par le portail.`);
+  } else if (jobsStore.isVmNameInFlight(vmName)) {
+    errors.push(`Un provisioning pour '${vmName}' est deja en cours.`);
   }
 
   if (!Number.isInteger(cpuCores) || cpuCores < 1 || cpuCores > 8) {
@@ -58,23 +60,19 @@ function validateInput(body) {
   };
 }
 
+// Plusieurs provisionings peuvent tourner en meme temps : seules les
+// sections a etat partage (terraform, checkout git distant) sont
+// serialisees en interne par l'orchestrateur (voir orchestrator.js), pas
+// la soumission elle-meme.
 router.post("/provision", (req, res) => {
   const { errors, input } = validateInput(req.body);
 
   if (errors.length > 0) {
-    return res.status(400).render("form", { errors, services: SERVICES, locked: lockService.isLocked() });
-  }
-
-  if (!lockService.tryAcquire()) {
-    return res.status(409).render("form", {
-      errors: ["Un provisioning est deja en cours - reessayez une fois termine."],
-      services: SERVICES,
-      locked: true,
-    });
+    return res.status(400).render("form", { errors, services: SERVICES, jobs: jobsStore.listJobs(), phases });
   }
 
   const job = jobsStore.createJob(input);
-  runProvisioning(job).finally(() => lockService.release());
+  runProvisioning(job);
 
   res.redirect(`/jobs/${job.id}`);
 });

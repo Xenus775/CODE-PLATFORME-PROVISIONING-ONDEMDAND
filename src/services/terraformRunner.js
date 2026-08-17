@@ -1,27 +1,48 @@
-const { execFile } = require("child_process");
+const { spawn } = require("child_process");
 const config = require("../config");
 
 // 25 min : l'agent QEMU peut mettre plus de 15 min a repondre pendant la
 // creation d'une VM (observe plusieurs fois cette session), le provider
 // bpg/proxmox attend son propre timeout interne (15m, voir agent.timeout
 // dans modules/vm) avant d'abandonner - il faut de la marge au-dessus.
+//
+// spawn (pas execFile) : la sortie est appendee au log ligne par ligne au
+// fur et a mesure, execFile ne rend la main qu'a la fin de la commande -
+// pendant un apply de 15-20 min, l'UI ne montrait donc rien avant la fin.
 function run(args, log, timeoutMs = 25 * 60 * 1000) {
   return new Promise((resolve, reject) => {
     log(`$ terraform ${args.join(" ")}`);
-    execFile(
-      "terraform",
-      args,
-      { cwd: config.terraformRepoPath, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        if (stdout) log(stdout.trim());
-        if (stderr) log(stderr.trim());
-        if (error) {
-          reject(new Error(`terraform ${args[0]} a echoue : ${error.message}`));
-          return;
-        }
-        resolve(stdout);
+    const child = spawn("terraform", args, { cwd: config.terraformRepoPath });
+
+    let buffer = "";
+    const flushLines = (chunk) => {
+      buffer += chunk;
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) log(line);
+    };
+
+    child.stdout.on("data", (d) => flushLines(d.toString()));
+    child.stderr.on("data", (d) => flushLines(d.toString()));
+
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+    }, timeoutMs);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (buffer) log(buffer);
+      if (code !== 0) {
+        reject(new Error(`terraform ${args[0]} a echoue (code ${code})`));
+        return;
       }
-    );
+      resolve();
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(new Error(`terraform ${args[0]} a echoue : ${err.message}`));
+    });
   });
 }
 

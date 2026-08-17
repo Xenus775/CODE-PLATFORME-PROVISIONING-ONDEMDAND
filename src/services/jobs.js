@@ -26,6 +26,19 @@ function getJob(id) {
   return jobs.get(id);
 }
 
+// Plus recent d'abord - alimente la liste "provisionings en cours /
+// recents" sur le formulaire, pour retrouver un job lance depuis un autre
+// onglet/session sans avoir garde son URL.
+function listJobs() {
+  return [...jobs.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+}
+
+function isVmNameInFlight(vmName) {
+  return [...jobs.values()].some(
+    (j) => j.vmName === vmName && j.phase !== "done" && j.phase !== "failed"
+  );
+}
+
 function appendLog(job, line) {
   job.log.push(line);
 }
@@ -40,4 +53,4 @@ function finish(job, error) {
   job.error = error ? String(error.message || error) : null;
 }
 
-module.exports = { createJob, getJob, appendLog, setPhase, finish };
+module.exports = { createJob, getJob, listJobs, isVmNameInFlight, appendLog, setPhase, finish };

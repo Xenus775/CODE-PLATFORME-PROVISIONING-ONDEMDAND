@@ -1,4 +1,63 @@
 ==================================================
+DECISION : Provisionnings paralleles avec verrous cibles, pas un verrou global
+==================================================
+
+CONTEXTE
+--------
+
+Le premier modele n'autorisait qu'un seul provisioning a la fois (verrou
+global) : simple, mais un second operateur voulant creer une VM devait
+attendre la fin complete du precedent (souvent 15-20 min), alors que la
+plus grande partie du pipeline (attente du boot, decouverte d'IP,
+ansible-playbook) n'a aucune raison de bloquer un autre provisioning.
+
+DECISION
+--------
+
+Suppression du verrou global. Deux mutex en memoire, chacun scope au plus
+petit etat partage reel :
+- terraformLock : protege le checkout Terraform de portal01 (un seul
+  terraform.tfstate local) - couvre allocation VMID, ecriture du fichier
+  genere, terraform init/plan/apply, commit/push.
+- controlNodeGitLock : protege le checkout Ansible sur LPRANSIBLE01 (git
+  pull/commit/push sur un seul repertoire) - couvre uniquement la mise a
+  jour de l'inventaire, pas l'execution d'ansible-playbook qui la suit.
+
+Tout le reste (decouverte d'IP, execution d'ansible-playbook contre des
+VM differentes) tourne reellement en parallele entre plusieurs jobs.
+
+RAISON
+------
+
+Les seules ressources vraiment partagees et non concurrence-safe sont ces
+deux checkouts locaux (un seul state Terraform, un seul repertoire git par
+depot). Ansible lui-meme ne partage aucun etat entre deux executions
+ciblant des hotes differents (`--limit`), donc rien ne justifie de le
+serialiser.
+
+IMPACT
+------
+
+Positif : un second provisioning peut demarrer immediatement sans
+attendre la fin du premier ; l'attente reelle se limite aux quelques
+minutes ou le state Terraform ou le checkout Ansible sont effectivement
+en cours d'ecriture.
+Negatif : legerement plus complexe qu'un simple booleen ; suppose que tous
+les provisionnings passent par ce meme process Node (vrai tant qu'un seul
+portal01 existe).
+
+ALTERNATIVES REJETEES
+---------------------
+
+Un checkout Terraform isole par job (git worktree/clone dedie, state
+independant) a ete envisage pour un parallelisme total, mais ecarte :
+merger plusieurs states independants dans le state canonique apres coup
+est complexe et fragile pour un gain marginal, la vraie duree bloquante
+(creation VM + attente agent QEMU) restant de toute facon serialisee par
+la nature meme de Terraform sur un state partage.
+
+
+==================================================
 DECISION : VM dediee portal01 plutot qu'extension de LPRANSIBLE01
 ==================================================
 

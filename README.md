@@ -76,8 +76,11 @@ npm start
 
 - Formulaire protege par authentification basique (identifiant unique
   partage, voir `.env`).
-- Un seul provisioning a la fois (verrou global en memoire) : terraform et
-  git ne supportent pas des executions concurrentes propres sur ce depot.
+- Plusieurs provisionnings peuvent tourner en parallele. Seules les
+  sections a etat partage (checkout Terraform, checkout Ansible sur
+  LPRANSIBLE01) sont serialisees en interne par deux mutex dedies ;
+  decouverte d'IP et `ansible-playbook` tournent en parallele entre jobs
+  (voir `DECISIONS.txt`).
 - Aucun identifiant genere n'est stocke : affiche une seule fois sur la
   page de resultat, a noter immediatement.
 - Aucun secret commite (`.env` exclu par `.gitignore`, meme pattern que
