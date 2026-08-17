@@ -24,7 +24,12 @@ function runRemote({ host, user, keyPath, command, timeoutMs = 20 * 60 * 1000 })
           reject(new Error(`SSH vers ${host} echoue : ${error.message}\n${stderr}`));
           return;
         }
-        resolve(stdout + stderr);
+        // stdout/stderr separes : le client SSH lui-meme ecrit sur stderr
+        // (ex: "Permanently added 'X.X.X.X' to the list of known hosts"
+        // lors d'une premiere connexion), ce qui a deja fait remonter
+        // l'IP de l'hote Proxmox par erreur quand tout etait concatene et
+        // parse avec une regex generique. Voir ipDiscovery.js.
+        resolve({ stdout, stderr });
       }
     );
   });

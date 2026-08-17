@@ -74,13 +74,14 @@ async function runProvisioning(job) {
       ip,
       playbook: serviceDef.playbook,
     });
-    const output = await runRemote({
+    const remoteResult = await runRemote({
       host: config.controlNodeHost,
       user: config.controlNodeUser,
       keyPath: config.controlNodeSshKeyPath,
       command: remoteCommand,
       timeoutMs: 20 * 60 * 1000,
     });
+    const output = remoteResult.stdout + remoteResult.stderr;
     log(output);
 
     job.credentials = parseMarkers(output);

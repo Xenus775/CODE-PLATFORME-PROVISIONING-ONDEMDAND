@@ -27,29 +27,40 @@ async function pollAgent(vmId, mac, log) {
 
 // Fallback ARP/tcpdump via l'hote Proxmox : la methode qui a fonctionne de
 // facon fiable cette session, quand l'agent QEMU ne repondait pas.
+//
+// IMPORTANT : on ne parse que stdout, jamais stderr. La toute premiere
+// connexion SSH du compte portal vers l'hote Proxmox ecrit sur stderr
+// "Permanently added 'X.X.X.X' (ED25519) to the list of known hosts" -
+// avec stdout+stderr concatenes et une regex generique, cette IP de
+// l'hote Proxmox lui-meme a ete confondue avec celle de la VM lors du
+// premier test de bout en bout via le formulaire. Les regex ci-dessous
+// sont aussi ancrees au format exact de la ligne attendue plutot que de
+// chercher n'importe quelle sequence de chiffres/points.
 async function pollArp(mac, log) {
-  const neigh = await runRemote({
+  const neighResult = await runRemote({
     host: config.proxmoxSshHost,
     user: config.proxmoxSshUser,
     keyPath: config.proxmoxSshKeyPath,
     command: `ip neigh show | grep -i ${mac} || true`,
   });
-  const instant = /((?:\d{1,3}\.){3}\d{1,3})/.exec(neigh);
+  const instant = /^(\d{1,3}(?:\.\d{1,3}){3})\s/m.exec(neighResult.stdout);
   if (instant) return instant[1];
 
   for (let attempt = 0; attempt < ARP_MAX_ATTEMPTS; attempt++) {
     log(`  capture tcpdump ${attempt + 1}/${ARP_MAX_ATTEMPTS} (${ARP_ATTEMPT_TIMEOUT_S}s)...`);
-    const output = await runRemote({
+    const tcpdumpResult = await runRemote({
       host: config.proxmoxSshHost,
       user: config.proxmoxSshUser,
       keyPath: config.proxmoxSshKeyPath,
-      command: `timeout ${ARP_ATTEMPT_TIMEOUT_S} tcpdump -i vmbr0 -en ether host ${mac} -c 5 2>&1 || true`,
+      // pas de 2>&1 : la banniere tcpdump ("listening on...") reste sur
+      // stderr, seules les lignes de paquets capturees vont sur stdout.
+      command: `timeout ${ARP_ATTEMPT_TIMEOUT_S} tcpdump -i vmbr0 -en ether host ${mac} -c 5 || true`,
       timeoutMs: (ARP_ATTEMPT_TIMEOUT_S + 10) * 1000,
     });
-    const found = [...output.matchAll(/(\d{1,3}(?:\.\d{1,3}){3})/g)].find(
-      (m) => !m[1].startsWith("127.")
-    );
-    if (found) return found[1];
+    // Reponse ARP explicite ("Reply <ip> is-at <mac>") : confirme que la
+    // VM revendique bien cette IP, contrairement a une simple requete.
+    const reply = /Reply\s+(\d{1,3}(?:\.\d{1,3}){3})\s+is-at/.exec(tcpdumpResult.stdout);
+    if (reply) return reply[1];
   }
   return null;
 }
