@@ -29,10 +29,20 @@ app.use(authRouter);
 // Tout ce qui suit necessite une session authentifiee.
 app.use(requireAuth);
 
+// Disponibles dans toutes les vues sans que chaque route ait a les passer
+// explicitement (ex: le lien "Administration" de la sidebar, visible
+// seulement pour role === "admin").
+app.use((req, res, next) => {
+  res.locals.user = req.session.user;
+  res.locals.role = req.session.role;
+  next();
+});
+
 app.use(require("./routes/form"));
 app.use(require("./routes/provision"));
 app.use(require("./routes/jobs"));
 app.use(require("./routes/executions"));
+app.use(require("./routes/admin"));
 
 app.listen(config.port, () => {
   console.log(`Portail de provisioning en ecoute sur le port ${config.port}`);

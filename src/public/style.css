@@ -243,6 +243,27 @@ h1 {
   box-shadow: var(--shadow);
   padding: 1.75rem;
   margin-bottom: 1.5rem;
+  transition: border-color 0.15s;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+}
+.card-header h2 {
+  margin: 0;
+}
+
+.form-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-inline input {
+  width: auto;
+  flex: 1;
 }
 
 .card h2 {
@@ -271,6 +292,8 @@ h1 {
 
 input[type="text"],
 input[type="number"],
+input[type="password"],
+input[type="email"],
 select {
   width: 100%;
   background: var(--bg-elevated);
@@ -283,11 +306,26 @@ select {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+input[type="email"]::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
 input:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%238b93a8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.2rem;
 }
 
 .radio-group {
@@ -379,12 +417,70 @@ button {
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.1s;
   font-family: inherit;
 }
 
 button:hover {
   background: var(--accent-hover);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+button.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+button.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--card-border);
+}
+button.btn-secondary:hover {
+  background: var(--card);
+  border-color: var(--accent);
+}
+
+button.btn-danger {
+  background: transparent;
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+button.btn-danger:hover {
+  background: var(--error-soft);
+  border-color: var(--error);
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.role-tag {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.role-tag.role-admin {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.role-tag.role-operator {
+  background: var(--bg-elevated);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
 }
 
 .errors {

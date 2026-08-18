@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include('partials/head', { title: 'Administration' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { active: 'admin', user: user, role: role }) %>
+
+    <main class="content">
+      <h1>Administration</h1>
+      <p class="subtitle">Comptes autorises a se connecter et a lancer des provisionnings.</p>
+
+      <% if (error) { %>
+        <ul class="errors"><li><%= error %></li></ul>
+      <% } %>
+
+      <div class="card">
+        <div class="card-header"><h2>Nouveau compte</h2></div>
+        <form method="post" action="/admin/users">
+          <div class="field-row">
+            <div class="field">
+              <label>Identifiant</label>
+              <input type="text" name="username" required>
+            </div>
+            <div class="field">
+              <label>Mot de passe</label>
+              <input type="password" name="password" required>
+            </div>
+          </div>
+          <div class="field">
+            <label>Role</label>
+            <select name="role">
+              <option value="operator">Operator (peut provisionner)</option>
+              <option value="admin">Admin (peut aussi gerer les comptes)</option>
+            </select>
+          </div>
+          <button type="submit">Creer le compte</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Comptes existants</h2></div>
+        <div class="table-wrap">
+          <table class="exec-table">
+            <thead>
+              <tr>
+                <th>Identifiant</th>
+                <th>Role</th>
+                <th>Cree le</th>
+                <th>Nouveau mot de passe</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% users.forEach(function(u) { %>
+                <tr>
+                  <td><strong><%= u.username %></strong><% if (u.username === user) { %> <span class="empty-state">(vous)</span><% } %></td>
+                  <td>
+                    <form method="post" action="/admin/users/<%= u.username %>/role" class="form-inline">
+                      <select name="role" onchange="this.form.submit()">
+                        <option value="operator" <%= u.role === 'operator' ? 'selected' : '' %>>Operator</option>
+                        <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                      </select>
+                    </form>
+                  </td>
+                  <td><%= new Date(u.createdAt).toLocaleDateString('fr-FR') %></td>
+                  <td>
+                    <form method="post" action="/admin/users/<%= u.username %>/password" class="form-inline">
+                      <input type="password" name="password" placeholder="nouveau mot de passe" minlength="4">
+                      <button type="submit" class="btn-sm btn-secondary">Changer</button>
+                    </form>
+                  </td>
+                  <td>
+                    <form method="post" action="/admin/users/<%= u.username %>/delete" onsubmit="return confirm('Supprimer le compte ' + <%- JSON.stringify(u.username) %> + ' ?')">
+                      <button type="submit" class="btn-sm btn-danger" <%= u.username === user ? 'disabled' : '' %>>Supprimer</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

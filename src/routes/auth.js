@@ -14,9 +14,11 @@ router.post("/login", async (req, res) => {
   if (!ok) {
     return res.status(401).render("login", { error: "Identifiants invalides." });
   }
+  const user = users.findUser(username);
   req.session.regenerate((err) => {
     if (err) return res.status(500).render("login", { error: "Erreur de session." });
     req.session.user = username;
+    req.session.role = user.role;
     res.redirect("/");
   });
 });
@@ -30,4 +32,9 @@ function requireAuth(req, res, next) {
   return res.redirect("/login");
 }
 
-module.exports = { router, requireAuth };
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.role === "admin") return next();
+  return res.status(403).send("Acces reserve aux administrateurs.");
+}
+
+module.exports = { router, requireAuth, requireAdmin };

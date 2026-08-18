@@ -13,6 +13,12 @@
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8h3l2-5 2 10 2-5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Executions
     </a>
+    <% if (role === "admin") { %>
+      <a href="/admin" class="nav-item <%= active === 'admin' ? 'active' : '' %>">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 14c0-2.5 2.5-4 5.5-4s5.5 1.5 5.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Administration
+      </a>
+    <% } %>
   </nav>
 
   <div class="sidebar-footer">

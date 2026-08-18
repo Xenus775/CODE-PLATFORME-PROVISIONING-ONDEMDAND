@@ -73,10 +73,17 @@ npm start
 Pas de Basic Auth : une vraie session (cookie signe, `express-session`)
 apres connexion via `/login`, avec des mots de passe **haches** (bcrypt,
 jamais en clair) stockes dans `data/users.json` (hors git, permissions
-restreintes). Gestion des comptes en ligne de commande sur `portal01` :
+restreintes). Deux roles :
+
+- `admin` : peut se connecter, provisionner, **et** gerer les comptes via
+  la page `/admin` (creer, changer role/mot de passe, supprimer).
+- `operator` : peut se connecter et provisionner, pas d'acces a `/admin`.
+
+Bootstrap du tout premier compte en ligne de commande sur `portal01`
+(les suivants se creent ensuite depuis `/admin`) :
 
 ```bash
-npm run create-user -- <username> <password>   # cree ou change le mot de passe
+npm run create-user -- <username> <password> [admin|operator]   # role par defaut : admin
 ```
 
 ## Services supportes

@@ -17,27 +17,39 @@ Authentification par session (`express-session`, cookie signe httpOnly)
 avec des comptes stockes dans un fichier JSON local
 (`data/users.json`, permissions 0600, hors git), mots de passe **haches**
 avec bcrypt (jamais en clair, ni sur disque ni en memoire au-dela de la
-requete). Gestion des comptes via un script CLI
-(`npm run create-user -- <user> <password>`), pas d'interface
-d'administration web pour l'instant.
+requete). Une page web `/admin` (reservee au role `admin`) permet de
+creer/supprimer des comptes et de changer role/mot de passe sans repasser
+par SSH ; le script CLI reste disponible pour le tout premier bootstrap
+(avant qu'aucun compte n'existe pour se connecter a `/admin`).
 
 RAISON
 ------
 
 bcrypt + fichier JSON est la plus petite implementation qui soit
 reellement correcte en securite (pas de mot de passe en clair stocke nul
-part), sans tirer une base de donnees pour un outil a quelques
-utilisateurs - coherent avec le choix deja fait de ne pas avoir de DB
-pour l'etat des jobs (voir plus bas).
+part). Le fichier JSON reste largement suffisant pour la page `/admin` :
+lire/modifier une liste de quelques comptes ne justifie pas une vraie base
+de donnees (SQLite, etc.) - la question a ete explicitement reposee au
+moment d'ajouter la gestion web des comptes (est-ce qu'une DB devient
+necessaire pour que ce soit "gere proprement" ?), et la reponse reste non
+: le volume (quelques comptes, lectures/ecritures rares et jamais
+concurrentes vu l'usage) ne change pas la conclusion deja actee pour
+l'etat des jobs plus bas dans ce fichier. Une DB introduirait une
+dependance (fichier de donnees binaire, migrations, driver) sans benefice
+reel a cette echelle.
 
 IMPACT
 ------
 
 Positif : plus de mot de passe en clair sur disque ; sessions
-revocables (cookie), plusieurs comptes possibles.
-Negatif : pas d'auto-inscription ni de reset de mot de passe en libre
-service - toute gestion de compte passe par un acces SSH a `portal01`,
-acceptable pour un usage personnel a quelques operateurs.
+revocables (cookie), plusieurs comptes avec deux niveaux de droits
+(admin / operator) ; gestion des comptes sans acces SSH une fois le
+premier admin bootstrape.
+Negatif : pas d'auto-inscription ; en cas d'ecriture concurrente sur
+`users.json` (deux admins modifient des comptes au meme instant), la
+derniere ecriture gagne - improbable a l'echelle d'un outil personnel,
+mais une vraie DB serait necessaire si le nombre d'administrateurs actifs
+en parallele grandissait significativement.
 
 ALTERNATIVES REJETEES
 ---------------------
