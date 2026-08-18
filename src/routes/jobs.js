@@ -1,13 +1,14 @@
 const express = require("express");
 const jobsStore = require("../services/jobs");
 const phases = require("../services/phases");
+const { SERVICES } = require("../services/orchestrator");
 
 const router = express.Router();
 
 router.get("/jobs/:id", (req, res) => {
   const job = jobsStore.getJob(req.params.id);
   if (!job) return res.status(404).send("Job introuvable.");
-  res.render("job", { job, phases });
+  res.render("job", { job, phases, services: SERVICES, user: req.session.user });
 });
 
 router.get("/jobs/:id/data", (req, res) => {
@@ -16,6 +17,7 @@ router.get("/jobs/:id/data", (req, res) => {
   res.json({
     id: job.id,
     phase: job.phase,
+    failedAtPhase: job.failedAtPhase,
     log: job.log,
     vmName: job.vmName,
     ip: job.ip,

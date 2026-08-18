@@ -15,6 +15,7 @@ function createJob(input) {
     ip: null,
     credentials: [],
     error: null,
+    failedAtPhase: null,
     startedAt: new Date().toISOString(),
     finishedAt: null,
   };
@@ -49,8 +50,14 @@ function setPhase(job, phase) {
 
 function finish(job, error) {
   job.finishedAt = new Date().toISOString();
-  job.phase = error ? "failed" : "done";
-  job.error = error ? String(error.message || error) : null;
+  if (error) {
+    job.failedAtPhase = job.phase;
+    job.phase = "failed";
+    job.error = String(error.message || error);
+  } else {
+    job.phase = "done";
+    job.error = null;
+  }
 }
 
 module.exports = { createJob, getJob, listJobs, isVmNameInFlight, appendLog, setPhase, finish };

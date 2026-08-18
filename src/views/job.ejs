@@ -1,49 +1,58 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <%- include('partials/head', { title: job.vmName + ' - provisioning' }) %>
+  <%- include('partials/head', { title: job.vmName + ' - execution' }) %>
 </head>
 <body>
-  <div class="page">
-    <div class="topbar">
-      <a class="brand" href="/"><span class="brand-mark">IaC</span> Portail de provisioning</a>
-      <a class="link" href="/">&larr; Nouveau provisioning</a>
-    </div>
+  <div class="app">
+    <%- include('partials/sidebar', { active: 'executions', user: user }) %>
 
-    <div class="job-header">
-      <h1><%= job.vmName %></h1>
-      <span class="badge <%= phases.badgeClass(job.phase) %>" id="badge">
-        <span class="badge-dot"></span><span id="badge-label"><%= phases.label(job.phase) %></span>
-      </span>
-    </div>
-    <p class="phase-line">IP : <span id="ip"><%= job.ip || 'en cours de decouverte...' %></span></p>
+    <main class="content">
+      <div class="job-header">
+        <h1><%= job.vmName %></h1>
+        <span class="badge <%= phases.badgeClass(job.phase) %>" id="badge">
+          <span class="badge-dot"></span><span id="badge-label"><%= phases.label(job.phase) %></span>
+        </span>
+      </div>
+      <p class="phase-line">
+        IP : <span id="ip"><%= job.ip || 'en cours de decouverte...' %></span>
+        &nbsp;&middot;&nbsp;
+        Services :
+        <% (job.input.services || []).forEach(function(s) { %>
+          <span class="svc-chip"><%= services[s] ? services[s].label : s %></span>
+        <% }) %>
+      </p>
 
-    <div id="banner-area">
-      <% if (job.error) { %>
-        <p class="banner banner-error">Erreur : <%= job.error %></p>
-      <% } %>
-    </div>
+      <div class="step-timeline" id="step-timeline"></div>
 
-    <div class="card">
-      <h2>Journal</h2>
-      <div class="log-viewer" id="log"><% job.log.forEach(function(line) { %><div class="line"><%= line %></div><% }) %></div>
-    </div>
+      <div id="banner-area">
+        <% if (job.error) { %>
+          <p class="banner banner-error">Erreur : <%= job.error %></p>
+        <% } %>
+      </div>
 
-    <div id="cred-area">
-      <% if (job.credentials && job.credentials.length > 0) { %>
-        <div class="card">
-          <h2>Identifiants generes</h2>
-          <p class="banner banner-warning">A noter maintenant - rien n'est stocke, cette page ne peut pas etre regeneree.</p>
-          <div id="cred-list"></div>
-        </div>
-      <% } %>
-    </div>
+      <div class="card">
+        <h2>Journal</h2>
+        <div class="log-viewer" id="log"><% job.log.forEach(function(line) { %><div class="line"><%= line %></div><% }) %></div>
+      </div>
+
+      <div id="cred-area">
+        <% if (job.credentials && job.credentials.length > 0) { %>
+          <div class="card">
+            <h2>Identifiants generes</h2>
+            <p class="banner banner-warning">A noter maintenant - rien n'est stocke, cette page ne peut pas etre regeneree.</p>
+            <div id="cred-list"></div>
+          </div>
+        <% } %>
+      </div>
+    </main>
   </div>
 
   <script>
     const jobId = <%- JSON.stringify(job.id) %>;
     const FINAL_PHASES = ["done", "failed"];
     const PHASE_LABELS = <%- JSON.stringify(phases.LABELS) %>;
+    const STEPS = <%- JSON.stringify(phases.STEPS) %>;
     let logLineCount = <%- job.log.length %>;
     let credentialsRendered = <%- job.credentials.length > 0 ? 'true' : 'false' %>;
 
@@ -52,6 +61,34 @@
       if (phase === "failed") return "badge-failed";
       if (phase.startsWith("queued")) return "badge-queued";
       return "badge-running";
+    }
+
+    function computeSteps(currentPhase, failedAtPhase) {
+      if (currentPhase === "done") return STEPS.map((s) => ({ ...s, state: "done" }));
+      if (currentPhase === "failed") {
+        const failIndex = STEPS.findIndex((s) => s.phases.includes(failedAtPhase));
+        return STEPS.map((s, i) => ({
+          ...s,
+          state: failIndex === -1 ? "pending" : i < failIndex ? "done" : i === failIndex ? "failed" : "pending",
+        }));
+      }
+      const currentIndex = STEPS.findIndex((s) => s.phases.includes(currentPhase));
+      return STEPS.map((s, i) => ({
+        ...s,
+        state: i < currentIndex ? "done" : i === currentIndex ? "active" : "pending",
+      }));
+    }
+
+    function renderTimeline(phase, failedAtPhase) {
+      const steps = computeSteps(phase, failedAtPhase);
+      const el = document.getElementById("step-timeline");
+      el.innerHTML = steps
+        .map(function (s, i) {
+          const icon = s.state === "done" ? "&check;" : s.state === "failed" ? "&times;" : s.state === "active" ? "&hellip;" : (i + 1);
+          const arrow = i < steps.length - 1 ? '<span class="step-arrow">&rarr;</span>' : "";
+          return '<span class="step step-' + s.state + '">' + icon + " " + s.label + "</span>" + arrow;
+        })
+        .join("");
     }
 
     function escapeHtml(s) {
@@ -107,6 +144,7 @@
       document.getElementById("badge").className = "badge " + badgeClass(data.phase);
       document.getElementById("badge-label").textContent = PHASE_LABELS[data.phase] || data.phase;
       if (data.ip) document.getElementById("ip").textContent = data.ip;
+      renderTimeline(data.phase, data.failedAtPhase);
 
       if (data.log.length > logLineCount) {
         appendLogLines(data.log.slice(logLineCount));
@@ -127,6 +165,7 @@
       }
     }
 
+    renderTimeline(<%- JSON.stringify(job.phase) %>, <%- JSON.stringify(job.failedAtPhase) %>);
     if (!FINAL_PHASES.includes(<%- JSON.stringify(job.phase) %>)) {
       poll();
     }

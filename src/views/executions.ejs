@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include('partials/head', { title: 'Executions' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { active: 'executions', user: user }) %>
+
+    <main class="content">
+      <h1>Executions</h1>
+      <p class="subtitle">Historique de tous les provisionnings.</p>
+
+      <%
+        const running = jobs.filter(j => j.phase !== 'done' && j.phase !== 'failed').length;
+        const done = jobs.filter(j => j.phase === 'done').length;
+        const failed = jobs.filter(j => j.phase === 'failed').length;
+      %>
+      <div class="stats-row">
+        <div class="stat-tile"><div class="num"><%= jobs.length %></div><div class="lbl">Total</div></div>
+        <div class="stat-tile"><div class="num"><%= running %></div><div class="lbl">En cours</div></div>
+        <div class="stat-tile"><div class="num"><%= done %></div><div class="lbl">Reussies</div></div>
+        <div class="stat-tile"><div class="num"><%= failed %></div><div class="lbl">Echouees</div></div>
+      </div>
+
+      <div class="card">
+        <% if (jobs.length === 0) { %>
+          <p class="empty-state">Aucune execution pour l'instant.</p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="exec-table">
+              <thead>
+                <tr>
+                  <th>VM</th>
+                  <th>Services</th>
+                  <th>IP</th>
+                  <th>Statut</th>
+                  <th>Debut</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% jobs.forEach(function(job) { %>
+                  <tr class="clickable" onclick="window.location='/jobs/<%= job.id %>'">
+                    <td><a class="row-link" href="/jobs/<%= job.id %>"><strong><%= job.vmName %></strong></a></td>
+                    <td>
+                      <% (job.input.services || []).forEach(function(s) { %>
+                        <span class="svc-chip"><%= services[s] ? services[s].label : s %></span>
+                      <% }) %>
+                    </td>
+                    <td><%= job.ip || '-' %></td>
+                    <td>
+                      <span class="badge <%= phases.badgeClass(job.phase) %>">
+                        <span class="badge-dot"></span><%= phases.label(job.phase) %>
+                      </span>
+                    </td>
+                    <td><%= new Date(job.startedAt).toLocaleString('fr-FR') %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

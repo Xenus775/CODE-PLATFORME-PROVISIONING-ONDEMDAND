@@ -1,4 +1,95 @@
 ==================================================
+DECISION : Authentification par session + mots de passe haches, pas de DB
+==================================================
+
+CONTEXTE
+--------
+
+La Basic Auth initiale (un seul identifiant partage en clair dans .env)
+etait volontairement minimale pour un premier prototype, mais ne
+convient plus : mot de passe en clair sur disque, pas de vraie session,
+pas de plusieurs comptes possibles.
+
+DECISION
+--------
+
+Authentification par session (`express-session`, cookie signe httpOnly)
+avec des comptes stockes dans un fichier JSON local
+(`data/users.json`, permissions 0600, hors git), mots de passe **haches**
+avec bcrypt (jamais en clair, ni sur disque ni en memoire au-dela de la
+requete). Gestion des comptes via un script CLI
+(`npm run create-user -- <user> <password>`), pas d'interface
+d'administration web pour l'instant.
+
+RAISON
+------
+
+bcrypt + fichier JSON est la plus petite implementation qui soit
+reellement correcte en securite (pas de mot de passe en clair stocke nul
+part), sans tirer une base de donnees pour un outil a quelques
+utilisateurs - coherent avec le choix deja fait de ne pas avoir de DB
+pour l'etat des jobs (voir plus bas).
+
+IMPACT
+------
+
+Positif : plus de mot de passe en clair sur disque ; sessions
+revocables (cookie), plusieurs comptes possibles.
+Negatif : pas d'auto-inscription ni de reset de mot de passe en libre
+service - toute gestion de compte passe par un acces SSH a `portal01`,
+acceptable pour un usage personnel a quelques operateurs.
+
+ALTERNATIVES REJETEES
+---------------------
+
+OAuth/SSO externe ecarte : sur-dimensionne pour un outil interne a un
+seul foyer. Une vraie base utilisateurs (SQLite, etc.) ecartee pour la
+meme raison qu'ailleurs dans ce depot : aucun besoin reel au-dela de
+quelques comptes, un fichier JSON suffit et reste trivial a inspecter/
+sauvegarder.
+
+
+==================================================
+DECISION : Une VM peut cumuler plusieurs services a la fois
+==================================================
+
+CONTEXTE
+--------
+
+La premiere version du formulaire n'autorisait qu'un seul service par VM
+(bouton radio). En pratique une VM heberge souvent plusieurs services lies
+(ex: nginx + docker, ou apache + redis).
+
+DECISION
+--------
+
+Le formulaire passe a des cases a cocher (`services`, tableau cote
+serveur). Une VM peut donc appartenir a plusieurs groupes d'inventaire
+Ansible a la fois (`scripts/add-host.py --group` devient repetable cote
+depot Ansible), et l'orchestrateur enchaine `site.yml` puis un playbook
+par service choisi puis `exploitation-account.yml`, tous cibles sur la
+meme VM via `--limit`.
+
+RAISON
+------
+
+Coherent avec un usage reel (peu de VM sont mono-service dans la
+pratique) et ne complique pas significativement le pipeline : chaque
+playbook de service reste independant et idempotent, les executer a la
+suite sur le meme hote ne pose pas de probleme particulier.
+
+IMPACT
+------
+
+Positif : plus flexible, moins de VM a creer separement pour des
+services complementaires.
+Negatif : aucune verification de compatibilite entre services choisis
+(ex: apache + nginx entreraient en conflit sur le port 80) - laisse a la
+responsabilite de l'operateur, pas de blocage cote formulaire pour rester
+simple.
+
+
+==================================================
 DECISION : Provisionnings paralleles avec verrous cibles, pas un verrou global
 ==================================================
 

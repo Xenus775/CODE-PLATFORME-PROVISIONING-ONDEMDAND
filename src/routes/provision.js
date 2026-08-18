@@ -18,7 +18,9 @@ function validateInput(body) {
   const memoryMb = Number(body.memoryMb);
   const networkMode = body.networkMode;
   const staticIp = (body.staticIp || "").trim();
-  const service = body.service;
+  // Cases a cocher : body.services est une chaine (une seule cochee), un
+  // tableau (plusieurs), ou absent (aucune) selon express.urlencoded.
+  const services = Array.isArray(body.services) ? body.services : body.services ? [body.services] : [];
 
   if (!VM_NAME_RE.test(vmName)) {
     errors.push("Nom de VM invalide (minuscules/chiffres/tirets, doit commencer par une lettre, 2-31 caracteres).");
@@ -44,7 +46,9 @@ function validateInput(body) {
     errors.push("IP fixe invalide (attendu : 192.168.10.x).");
   }
 
-  if (!Object.keys(SERVICES).includes(service)) {
+  if (services.length === 0) {
+    errors.push("Selectionnez au moins un service.");
+  } else if (services.some((s) => !Object.keys(SERVICES).includes(s))) {
     errors.push("Service invalide.");
   }
 
@@ -54,7 +58,7 @@ function validateInput(body) {
       vmName,
       cpuCores,
       memoryMb,
-      service,
+      services,
       network: networkMode === "static" ? { mode: "static", ip: staticIp } : { mode: "dhcp" },
     },
   };
@@ -68,7 +72,13 @@ router.post("/provision", (req, res) => {
   const { errors, input } = validateInput(req.body);
 
   if (errors.length > 0) {
-    return res.status(400).render("form", { errors, services: SERVICES, jobs: jobsStore.listJobs(), phases });
+    return res.status(400).render("form", {
+      errors,
+      services: SERVICES,
+      jobs: jobsStore.listJobs().slice(0, 5),
+      phases,
+      user: req.session.user,
+    });
   }
 
   const job = jobsStore.createJob(input);

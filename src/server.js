@@ -1,7 +1,8 @@
 const express = require("express");
-const basicAuth = require("express-basic-auth");
+const session = require("express-session");
 const path = require("path");
 const config = require("./config");
+const { router: authRouter, requireAuth } = require("./routes/auth");
 
 const app = express();
 
@@ -11,16 +12,27 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
-  basicAuth({
-    users: { [config.basicAuthUser]: config.basicAuthPassword },
-    challenge: true,
-    realm: "Portail de provisioning",
+  session({
+    secret: config.sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      maxAge: 12 * 60 * 60 * 1000, // 12h
+      sameSite: "lax",
+    },
   })
 );
+
+app.use(authRouter);
+
+// Tout ce qui suit necessite une session authentifiee.
+app.use(requireAuth);
 
 app.use(require("./routes/form"));
 app.use(require("./routes/provision"));
 app.use(require("./routes/jobs"));
+app.use(require("./routes/executions"));
 
 app.listen(config.port, () => {
   console.log(`Portail de provisioning en ecoute sur le port ${config.port}`);

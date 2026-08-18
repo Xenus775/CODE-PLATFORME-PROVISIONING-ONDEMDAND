@@ -1,3 +1,4 @@
+const path = require("path");
 require("dotenv").config();
 
 function required(name) {
@@ -11,8 +12,8 @@ function required(name) {
 module.exports = {
   port: Number(process.env.PORT || 3000),
 
-  basicAuthUser: required("BASIC_AUTH_USER"),
-  basicAuthPassword: required("BASIC_AUTH_PASSWORD"),
+  sessionSecret: required("SESSION_SECRET"),
+  usersFilePath: process.env.USERS_FILE_PATH || path.join(__dirname, "..", "data", "users.json"),
 
   terraformRepoPath: required("TERRAFORM_REPO_PATH"),
 

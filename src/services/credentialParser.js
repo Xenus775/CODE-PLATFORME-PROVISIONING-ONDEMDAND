@@ -9,6 +9,8 @@ const MARKERS = [
   { type: "MYSQL_ROOT_PASSWORD", fields: ["host", "user", "password"] },
   { type: "WORDPRESS_DB", fields: ["host", "db_name", "db_user", "db_password"] },
   { type: "WORDPRESS_ADMIN", fields: ["host", "user", "password", "url"] },
+  { type: "REDIS_PASSWORD", fields: ["host", "password"] },
+  { type: "SAMBA_CREDENTIALS", fields: ["host", "share", "user", "password", "path"] },
 ];
 
 function parseMarkers(output) {

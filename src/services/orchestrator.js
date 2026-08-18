@@ -9,11 +9,18 @@ const { runRemote } = require("./sshRunner");
 const { parseMarkers } = require("./credentialParser");
 const { createMutex } = require("./mutex");
 
+// Un service = un groupe d'inventaire Ansible + un playbook dedie. Une VM
+// peut cumuler plusieurs services (voir provision.js, formulaire a cases
+// a cocher) : elle appartient alors a plusieurs groupes en meme temps.
 const SERVICES = {
-  apache: { group: "webservers", playbook: "webserver.yml" },
-  wordpress: { group: "wordpress_servers", playbook: "wordpress.yml" },
-  postgres: { group: "postgres_servers", playbook: "postgres.yml" },
-  mysql: { group: "mysql_servers", playbook: "mysql.yml" },
+  apache: { label: "Apache", group: "webservers", playbook: "webserver.yml" },
+  nginx: { label: "nginx", group: "nginx_servers", playbook: "nginx.yml" },
+  wordpress: { label: "WordPress", group: "wordpress_servers", playbook: "wordpress.yml" },
+  postgres: { label: "PostgreSQL", group: "postgres_servers", playbook: "postgres.yml" },
+  mysql: { label: "MySQL / MariaDB", group: "mysql_servers", playbook: "mysql.yml" },
+  redis: { label: "Redis", group: "redis_servers", playbook: "redis.yml" },
+  docker: { label: "Docker", group: "docker_servers", playbook: "docker.yml" },
+  samba: { label: "Samba (partage fichiers)", group: "samba_servers", playbook: "samba.yml" },
 };
 
 // Deux verrous distincts, chacun scope au plus petit etat partage
@@ -26,32 +33,35 @@ const SERVICES = {
 const terraformLock = createMutex();
 const controlNodeGitLock = createMutex();
 
-function buildGitCommand({ group, vmName, ip }) {
+function buildGitCommand({ groups, vmName, ip }) {
   const repo = config.controlNodeRepoPath;
+  const groupFlags = groups.map((g) => `--group ${g}`).join(" ");
   return [
     `cd ${repo}`,
     "git pull",
-    `python3 scripts/add-host.py --group ${group} --name ${vmName} --ip ${ip}`,
+    `python3 scripts/add-host.py ${groupFlags} --name ${vmName} --ip ${ip}`,
     "git add -A",
     `git commit -m "Ajouter ${vmName} (portail de provisioning on-demand)"`,
     "git push origin main",
   ].join(" && ");
 }
 
-function buildAnsibleCommand({ vmName, playbook }) {
+function buildAnsibleCommand({ vmName, playbooks }) {
   const repo = config.controlNodeRepoPath;
-  return [
-    `cd ${repo}`,
-    `ansible-playbook site.yml --limit ${vmName}`,
-    `ansible-playbook ${playbook} --limit ${vmName}`,
-    `ansible-playbook exploitation-account.yml --limit ${vmName}`,
-  ].join(" && ");
+  const steps = [`cd ${repo}`, `ansible-playbook site.yml --limit ${vmName}`];
+  for (const playbook of playbooks) {
+    steps.push(`ansible-playbook ${playbook} --limit ${vmName}`);
+  }
+  steps.push(`ansible-playbook exploitation-account.yml --limit ${vmName}`);
+  return steps.join(" && ");
 }
 
 async function runProvisioning(job) {
   const log = (line) => jobsStore.appendLog(job, line);
-  const { vmName, cpuCores, memoryMb, network, service } = job.input;
-  const serviceDef = SERVICES[service];
+  const { vmName, cpuCores, memoryMb, network, services } = job.input;
+  const serviceDefs = services.map((s) => SERVICES[s]);
+  const groups = [...new Set(serviceDefs.map((s) => s.group))];
+  const playbooks = [...new Set(serviceDefs.map((s) => s.playbook))];
 
   try {
     jobsStore.setPhase(job, "queued_terraform");
@@ -66,7 +76,8 @@ async function runProvisioning(job) {
         vmId: allocatedId,
         cpuCores,
         memoryMb,
-        network: { ...network, service },
+        network,
+        services,
       });
       terraformTemplate.writeGeneratedTf(config.terraformRepoPath, vmName, hcl);
       log(`Fichier generated.${vmName}.tf ecrit.`);
@@ -92,7 +103,7 @@ async function runProvisioning(job) {
     jobsStore.setPhase(job, "queued_inventory");
     await controlNodeGitLock.runExclusive(async () => {
       jobsStore.setPhase(job, "updating_inventory");
-      const gitCommand = buildGitCommand({ group: serviceDef.group, vmName, ip });
+      const gitCommand = buildGitCommand({ groups, vmName, ip });
       await runRemote({
         host: config.controlNodeHost,
         user: config.controlNodeUser,
@@ -104,13 +115,13 @@ async function runProvisioning(job) {
     });
 
     jobsStore.setPhase(job, "configuring_ansible");
-    const ansibleCommand = buildAnsibleCommand({ vmName, playbook: serviceDef.playbook });
+    const ansibleCommand = buildAnsibleCommand({ vmName, playbooks });
     const ansibleResult = await runRemote({
       host: config.controlNodeHost,
       user: config.controlNodeUser,
       keyPath: config.controlNodeSshKeyPath,
       command: ansibleCommand,
-      timeoutMs: 20 * 60 * 1000,
+      timeoutMs: 30 * 60 * 1000,
       log,
     });
     const output = ansibleResult.stdout + ansibleResult.stderr;

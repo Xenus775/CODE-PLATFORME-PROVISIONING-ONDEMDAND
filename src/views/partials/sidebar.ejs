@@ -1,0 +1,29 @@
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-mark">IaC</span>
+    <span class="brand-text">Portail</span>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="/" class="nav-item <%= active === 'new' ? 'active' : '' %>">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      Nouveau provisioning
+    </a>
+    <a href="/executions" class="nav-item <%= active === 'executions' ? 'active' : '' %>">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8h3l2-5 2 10 2-5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Executions
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <% if (typeof user !== "undefined" && user) { %>
+      <div class="sidebar-user">
+        <span class="user-avatar"><%= user.charAt(0).toUpperCase() %></span>
+        <span class="user-name"><%= user %></span>
+      </div>
+      <form method="post" action="/logout">
+        <button type="submit" class="link-btn">Se deconnecter</button>
+      </form>
+    <% } %>
+  </div>
+</aside>

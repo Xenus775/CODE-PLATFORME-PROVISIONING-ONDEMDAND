@@ -5,11 +5,12 @@ const path = require("path");
 // les blocs ecrits a la main dans main.tf (module ./modules/vm). Fichier
 // plat a la racine du depot (generated.<vm>.tf) : un sous-dossier ne
 // serait pas charge automatiquement par Terraform.
-function renderGeneratedTf({ vmName, vmId, cpuCores, memoryMb, network }) {
+function renderGeneratedTf({ vmName, vmId, cpuCores, memoryMb, network, services }) {
   const networkLines =
     network.mode === "static"
       ? `  ip_address     = "${network.ip}/24"\n  gateway        = var.network_gateway\n`
       : `  # dhcp (choix "DHCP" dans le formulaire)\n`;
+  const tags = ["iac", "portal", ...services].map((t) => `"${t}"`).join(", ");
 
   return `# VM de service : ${vmName} (generee automatiquement par le portail de
 # provisioning on-demand le ${new Date().toISOString()}).
@@ -34,7 +35,7 @@ ${networkLines}
   ci_user        = var.ci_user
   ssh_public_key = var.ssh_public_key
 
-  tags = ["iac", "portal", "${network.service}"]
+  tags = [${tags}]
 }
 `;
 }

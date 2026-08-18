@@ -1,96 +1,97 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <%- include('partials/head', { title: 'Provisionner une VM' }) %>
+  <%- include('partials/head', { title: 'Nouveau provisioning' }) %>
 </head>
 <body>
-  <div class="page">
-    <div class="topbar">
-      <span class="brand"><span class="brand-mark">IaC</span> Portail de provisioning</span>
-    </div>
+  <div class="app">
+    <%- include('partials/sidebar', { active: 'new', user: user }) %>
 
-    <h1>Provisionner une VM</h1>
-    <p class="subtitle">Terraform cree la VM, Ansible installe le service demande.</p>
+    <main class="content">
+      <h1>Nouveau provisioning</h1>
+      <p class="subtitle">Terraform cree la VM, Ansible installe les services demandes.</p>
 
-    <% if (errors && errors.length > 0) { %>
-      <ul class="errors">
-        <% errors.forEach(function(e) { %>
-          <li><%= e %></li>
-        <% }) %>
-      </ul>
-    <% } %>
+      <% if (errors && errors.length > 0) { %>
+        <ul class="errors">
+          <% errors.forEach(function(e) { %>
+            <li><%= e %></li>
+          <% }) %>
+        </ul>
+      <% } %>
 
-    <div class="card">
-      <form method="post" action="/provision">
-        <div class="field">
-          <label>Nom de la VM</label>
-          <input type="text" name="vmName" pattern="[a-z][a-z0-9-]{1,30}" placeholder="ex: blog01" required>
-        </div>
-
-        <div class="field-row">
+      <div class="card">
+        <form method="post" action="/provision">
           <div class="field">
-            <label>CPU (coeurs)</label>
-            <input type="number" name="cpuCores" min="1" max="8" value="2" required>
+            <label>Nom de la VM</label>
+            <input type="text" name="vmName" pattern="[a-z][a-z0-9-]{1,30}" placeholder="ex: blog01" required>
           </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>CPU (coeurs)</label>
+              <input type="number" name="cpuCores" min="1" max="8" value="2" required>
+            </div>
+            <div class="field">
+              <label>RAM (Mo)</label>
+              <input type="number" name="memoryMb" min="512" max="16384" step="512" value="4096" required>
+            </div>
+          </div>
+
           <div class="field">
-            <label>RAM (Mo)</label>
-            <input type="number" name="memoryMb" min="512" max="16384" step="512" value="4096" required>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Reseau</label>
-          <div class="radio-group">
-            <label class="radio-pill">
-              <input type="radio" name="networkMode" value="dhcp" checked onchange="document.getElementById('staticIpField').style.display='none'">
-              <span>DHCP</span>
-            </label>
-            <label class="radio-pill">
-              <input type="radio" name="networkMode" value="static" onchange="document.getElementById('staticIpField').style.display='block'">
-              <span>IP fixe</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="field" id="staticIpField" style="display:none">
-          <label>Adresse IP (192.168.10.x)</label>
-          <input type="text" name="staticIp" pattern="192\.168\.10\.\d{1,3}" placeholder="192.168.10.50">
-        </div>
-
-        <div class="field">
-          <label>Service</label>
-          <div class="service-grid">
-            <% Object.keys(services).forEach(function(key, i) { %>
-              <label class="service-pill">
-                <input type="radio" name="service" value="<%= key %>" <%= i === 0 ? 'checked' : '' %> required>
-                <span><%= key %></span>
+            <label>Reseau</label>
+            <div class="radio-group">
+              <label class="radio-pill">
+                <input type="radio" name="networkMode" value="dhcp" checked onchange="document.getElementById('staticIpField').style.display='none'">
+                <span>DHCP</span>
               </label>
+              <label class="radio-pill">
+                <input type="radio" name="networkMode" value="static" onchange="document.getElementById('staticIpField').style.display='block'">
+                <span>IP fixe</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field" id="staticIpField" style="display:none">
+            <label>Adresse IP (192.168.10.x)</label>
+            <input type="text" name="staticIp" pattern="192\.168\.10\.\d{1,3}" placeholder="192.168.10.50">
+          </div>
+
+          <div class="field">
+            <label>Services (un ou plusieurs)</label>
+            <div class="service-grid">
+              <% Object.entries(services).forEach(function([key, def]) { %>
+                <label class="service-pill">
+                  <input type="checkbox" name="services" value="<%= key %>">
+                  <span><%= def.label %></span>
+                </label>
+              <% }) %>
+            </div>
+          </div>
+
+          <button type="submit">Provisionner</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Provisionnings recents</h2>
+        <% if (!jobs || jobs.length === 0) { %>
+          <p class="empty-state">Aucun provisioning pour l'instant.</p>
+        <% } else { %>
+          <div class="job-list">
+            <% jobs.forEach(function(job) { %>
+              <a class="job-row" href="/jobs/<%= job.id %>">
+                <span class="name"><%= job.vmName %></span>
+                <span class="meta"><%= new Date(job.startedAt).toLocaleString('fr-FR') %></span>
+                <span class="badge <%= phases.badgeClass(job.phase) %>">
+                  <span class="badge-dot"></span><%= phases.label(job.phase) %>
+                </span>
+              </a>
             <% }) %>
           </div>
-        </div>
-
-        <button type="submit">Provisionner</button>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>Provisionnings</h2>
-      <% if (!jobs || jobs.length === 0) { %>
-        <p class="empty-state">Aucun provisioning pour l'instant.</p>
-      <% } else { %>
-        <div class="job-list">
-          <% jobs.forEach(function(job) { %>
-            <a class="job-row" href="/jobs/<%= job.id %>">
-              <span class="name"><%= job.vmName %></span>
-              <span class="meta"><%= new Date(job.startedAt).toLocaleString('fr-FR') %></span>
-              <span class="badge <%= phases.badgeClass(job.phase) %>">
-                <span class="badge-dot"></span><%= phases.label(job.phase) %>
-              </span>
-            </a>
-          <% }) %>
-        </div>
-      <% } %>
-    </div>
+          <p style="margin: 0.9rem 0 0"><a class="link" href="/executions" style="color: var(--accent-hover); text-decoration: none; font-size: 0.85rem;">Voir toutes les executions &rarr;</a></p>
+        <% } %>
+      </div>
+    </main>
   </div>
 </body>
 </html>

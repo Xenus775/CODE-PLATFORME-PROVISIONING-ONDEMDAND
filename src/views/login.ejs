@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include('partials/head', { title: 'Connexion' }) %>
+</head>
+<body>
+  <div class="login-page">
+    <div class="card login-card">
+      <div class="sidebar-brand">
+        <span class="brand-mark">IaC</span>
+        <span class="brand-text">Portail de provisioning</span>
+      </div>
+
+      <% if (error) { %>
+        <ul class="errors"><li><%= error %></li></ul>
+      <% } %>
+
+      <form method="post" action="/login">
+        <div class="field">
+          <label>Identifiant</label>
+          <input type="text" name="username" autocomplete="username" required autofocus>
+        </div>
+        <div class="field">
+          <label>Mot de passe</label>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit">Se connecter</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
